@@ -12,51 +12,51 @@
 
 // Пакеты, использующиеся при обработке
 const { series, parallel, src, dest, watch, lastRun } = require('gulp');
-const fs = require('fs');
-const plumber = require('gulp-plumber');
+const fs = require('fs'); // операции над файловой системой
+const plumber = require('gulp-plumber'); // предупреждает об ошибках
 const del = require('del');
 const pug = require('gulp-pug');
-const through2 = require('through2');
+const through2 = require('through2'); // ?
 const rename = require('gulp-rename');
 const getClassesFromHtml = require('get-classes-from-html');
 const browserSync = require('browser-sync').create();
-const debug = require('gulp-debug');
+const debug = require('gulp-debug'); // показывает какие файлы прошли через pipe stream
 const sass = require('gulp-sass');
-const webpackStream = require('webpack-stream');
-const buffer = require('vinyl-buffer');
-const postcss = require('gulp-postcss');
+const webpackStream = require('webpack-stream'); // интеграция webpack с gulp
+const buffer = require('vinyl-buffer'); // ?
+const postcss = require('gulp-postcss'); // прогоняет css через несколько плагинов, парсит одни раз
 const autoprefixer = require("autoprefixer");
-const mqpacker = require("css-mqpacker");
-const atImport = require("postcss-import");
-const csso = require('gulp-csso');
-const inlineSVG = require('postcss-inline-svg');
-const objectFitImages = require('postcss-object-fit-images');
-const cpy = require('cpy');
-const svgstore = require('gulp-svgstore');
+const mqpacker = require("css-mqpacker"); // Pack same CSS media query rules into one using PostCSS
+const atImport = require("postcss-import"); // ?
+const csso = require('gulp-csso'); // Minify CSS with CSSO
+const inlineSVG = require('postcss-inline-svg'); // PostCSS plugin to reference an SVG file and control its attributes with CSS syntax
+const objectFitImages = require('postcss-object-fit-images'); // PostCSS plugin that updates the standard object-fit tag to work with the object-fit-images polyfill for browsers that do not natively support object-fit..
+const cpy = require('cpy'); //Copy files
+const svgstore = require('gulp-svgstore'); // Combine svg files into one with <symbol> elements. Read more about this in CSS Tricks article.
 const svgmin = require('gulp-svgmin');
-const spritesmith = require('gulp.spritesmith');
-const merge = require('merge-stream');
+const spritesmith = require('gulp.spritesmith'); // Convert a set of images into a spritesheet and CSS variables via gulp
+const merge = require('merge-stream'); // ???? Merge (interleave) a bunch of streams.
 const imagemin = require('gulp-imagemin');
 const prettyHtml = require('gulp-pretty-html');
-const replace = require('gulp-replace');
-const ghpages = require('gh-pages');
-const path = require('path');
+const replace = require('gulp-replace'); // A string replace plugin for gulp 3
+const ghpages = require('gh-pages'); // Publish files to a gh-pages branch on GitHub (or any other branch anywhere else).
+const path = require('path'); // provides utilities for working with file and directory paths
 
 // Глобальные настройки этого запуска
-const buildLibrary = process.env.BUILD_LIBRARY == 'yes' ? true : false;
+const buildLibrary = process.env.BUILD_LIBRARY == 'yes' ? true : false; // глобалная переменная BUILD_LIBRARY задается package.json scripts
 const nth = {};
-nth.config = require('./config.js');
+nth.config = require('./config.js'); // передаем объект из файла
 nth.blocksFromHtml = Object.create(nth.config.alwaysAddBlocks); // блоки из конфига сразу добавим в список блоков
 nth.scssImportsList = []; // список импортов стилей
-const dir = nth.config.dir;
+const dir = nth.config.dir; // список папок из конфига
 
 // Сообщение для компилируемых файлов
 let doNotEditMsg = '\n ВНИМАНИЕ! Этот файл генерируется автоматически.\n Любые изменения этого файла будут потеряны при следующей компиляции.\n Любое изменение проекта без возможности компиляции ДОЛЬШЕ И ДОРОЖЕ в 2-5 раз.\n\n';
 
 // Настройки pug-компилятора
 let pugOption = {
-  data: { repoUrl: 'https://github.com/nicothin/NTH-start-project', },
-  filters: { 'show-code': filterShowCode, },
+  data: { repoUrl: 'https://github.com/nicothin/NTH-start-project', }, // передаем pug-у адрес репозитория проекта
+  filters: { 'show-code': filterShowCode, }, // фильтр для кода
 };
 
 // Настройки бьютификатора
@@ -79,13 +79,14 @@ let postCssPlugins = [
 ];
 
 
+// компиляция файла src/pug/mixins.pug
 function writePugMixinsFile(cb) {
-  let allBlocksWithPugFiles = getDirectories('pug');
-  let pugMixins = '//-' + doNotEditMsg.replace(/\n /gm,'\n  ');
+  let allBlocksWithPugFiles = getDirectories('pug'); // массив имен блоков.pug
+  let pugMixins = '//-' + doNotEditMsg.replace(/\n /gm,'\n  '); // ??????
   allBlocksWithPugFiles.forEach(function(blockName) {
     pugMixins += `include ${dir.blocks.replace(dir.src,'../')}${blockName}/${blockName}.pug\n`;
   });
-  fs.writeFileSync(`${dir.src}pug/mixins.pug`, pugMixins);
+  fs.writeFileSync(`${dir.src}pug/mixins.pug`, pugMixins); // записываем все блоки в файл src/pug/mixins.pug
   cb();
 }
 exports.writePugMixinsFile = writePugMixinsFile;
@@ -95,21 +96,21 @@ function compilePug() {
   const fileList = [
     `${dir.src}pages/**/*.pug`
   ];
-  if(!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`);
+  if(!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`); // исключаем из компиляции файл библиотеки
   return src(fileList)
     .pipe(plumber({
-      errorHandler: function (err) {
+      errorHandler: function (err) { //????
         console.log(err.message);
         this.emit('end');
       }
     }))
-    .pipe(debug({title: 'Compiles '}))
+    .pipe(debug({title: 'Compiles '})) // смотрим какие файлы комплириуются
     .pipe(pug(pugOption))
     .pipe(prettyHtml(prettyOption))
     .pipe(replace(/^(\s*)(<button.+?>)(.*)(<\/button>)/gm, '$1$2\n$1  $3\n$1$4'))
     .pipe(replace(/^( *)(<.+?>)(<script>)([\s\S]*)(<\/script>)/gm, '$1$2\n$1$3\n$4\n$1$5\n'))
     .pipe(replace(/^( *)(<.+?>)(<script\s+src.+>)(?:[\s\S]*)(<\/script>)/gm, '$1$2\n$1$3$4'))
-    .pipe(through2.obj(getClassesToBlocksList))
+    .pipe(through2.obj(getClassesToBlocksList)) //???
     .pipe(dest(dir.build));
 }
 exports.compilePug = compilePug;
@@ -139,7 +140,7 @@ function compilePugFast() {
 exports.compilePugFast = compilePugFast;
 
 
-function copyAssets(cb) {
+function copyAssets(cb) { // копирование файлов из конфига
   for (let item in nth.config.addAssets) {
     let dest = `${dir.build}${nth.config.addAssets[item]}`;
     cpy(item, dest);
@@ -149,7 +150,7 @@ function copyAssets(cb) {
 exports.copyAssets = copyAssets;
 
 
-function copyImg(cb) {
+function copyImg(cb) { // ????
   let copiedImages = [];
   nth.blocksFromHtml.forEach(function(block) {
     let src = `${dir.blocks}${block}/img`;
@@ -557,10 +558,10 @@ function fileExist(filepath){
  * @return {array}         Массив из имён блоков
  */
 function getDirectories(ext) {
-  let source = dir.blocks;
-  let res = fs.readdirSync(source)
-    .filter(item => fs.lstatSync(source + item).isDirectory())
-    .filter(item => fileExist(source + item + '/' + item + '.' + ext));
+  let source = dir.blocks; // берем директорию с блоками
+  let res = fs.readdirSync(source) // читаем содержимое директории source
+    .filter(item => fs.lstatSync(source + item).isDirectory()) // выбираем только папки
+    .filter(item => fileExist(source + item + '/' + item + '.' + ext)); // выбираем папки, в которых есть файлы с указанным расширением
   return res;
 }
 
